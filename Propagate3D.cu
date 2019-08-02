@@ -10,13 +10,26 @@
 //////////////////////////
 
 
+// define some device functions using 2D threadindices and what not
+
+__global__ void fftshift2D(cufftComplex *dataIn,int row, int column)
+{ 
+    ix=threadIdx.x+blockIdx.x*blockDim.x;
+    iy=threadIdx.y+blockIdx.y*blockDim.y;
+    idx=ix+iy*row;
+
+    float a=1-2*((ix+iy)&1);
+    dataIn[idx].x*=a;
+    dataIn[idx].y*=a;
+}
+
 //#define IDX2R(i,j,N) (((i)*(N))+(j)) //easy way to address 2D array
 __global__ void fftshift_2D(cufftComplex *data, int arraysize, int row){
     const int numThreads = blockDim.x * gridDim.x;
 	const int threadID = blockIdx.x * blockDim.x + threadIdx.x;
 	for (int i = threadID; i < arraysize; i += numThreads)	{
-		int k=i%row;
-		int j=i/row;
+		int k=i%row; // xindex
+		int j=i/row; // yindex 
 		
 		float a = 1 - 2 * ((k + j) & 1);
 		data[i].x *= a;
@@ -380,7 +393,9 @@ void ReturnMagnitudeZStack2(float* h_bfpMag, float* h_bfpPhase,float* h_ImgOutMa
 	}
 	//free handle , Although might be able to reuse upon the last execution
 	cufftDestroy(BatchFFTPlan);
-	///////////
+    
+    
+    ///////////
 	// FFT ends
 	///////////
 	//Kernel to transform into a LV happy readable array
@@ -393,3 +408,27 @@ void ReturnMagnitudeZStack2(float* h_bfpMag, float* h_bfpPhase,float* h_ImgOutMa
 	cudaFree(d_3DiFFT);
 	cudaFree(d_ImgOutMag);
 }
+
+
+// Batched 2D FFT plan function
+
+
+	/* Create a batched 2D plan, or batch FFT , need to declare when each image begins! */
+	int istride = 1; //means every element is used in the computation
+	int ostride = 1; //means every element used in the computatio is output
+	int idist = row*column;
+	int odist = row*column;
+	int inembed[] = { row,column };
+	int onembed[] = { row,column };
+	const int NRANK = 2;
+	int n[NRANK] = { row,column };
+	int BATCH = zrange;
+	cufftHandle BatchFFTPlan;
+	if (cufftPlanMany(&BatchFFTPlan, NRANK, n,
+		inembed, istride, idist,// *inembed, istride, idist 
+		onembed, ostride, odist,// *onembed, ostride, odist 
+		CUFFT_C2C, BATCH) != CUFFT_SUCCESS){
+
+		fprintf(stderr, "CUFFT Error: Unable to create plan\n");
+		return;
+	}
