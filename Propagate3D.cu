@@ -363,48 +363,25 @@ void ReturnMagnitudeZStack2(float* h_bfpMag, float* h_bfpPhase,float* h_ImgOutMa
 	//Allocate cuda memory for 3D FFT
 	float* d_ImgOutMag;
 	cudaMalloc((void**)&d_ImgOutMag, mem3Darray);
-	/////////////////////////////////////////////////////////////////////////////////////////
-	///// Prepare batch 2D FFT plan, const declaration
-	/////////////////////////////////////////////////////////////////////////////////////////
-	/* Create a batched 2D plan, or batch FFT , need to declare when each image begins! */
-	int istride = 1; //means every element is used in the computation
-	int ostride = 1; //means every element used in the computatio is output
-	int idist = row*column;
-	int odist = row*column;
-	int inembed[] = { row,column };
-	int onembed[] = { row,column };
-	const int NRANK = 2;
-	int n[NRANK] = { row,column };
-	int BATCH = zrange;
-	cufftHandle BatchFFTPlan;
-	if (cufftPlanMany(&BatchFFTPlan, NRANK, n,
-		inembed, istride, idist,// *inembed, istride, idist 
-		onembed, ostride, odist,// *onembed, ostride, odist 
-		CUFFT_C2C, BATCH) != CUFFT_SUCCESS){
 
-		fprintf(stderr, "CUFFT Error: Unable to create plan\n");
-		return;
-	}
-    
-    //////// Execute the transform in-place
+	//FFT calculation goes here
+	cufftHandle BatchFFTPlan;
+	createFFTplan(BatchFFTplan,row,column,zrange);
+
 	if (cufftExecC2C(BatchFFTPlan, d_3DiFFT, d_3DiFFT, CUFFT_INVERSE) != CUFFT_SUCCESS) {
 		fprintf(stderr, "CUFFT Error: Failed to execute plan\n");
 		return;
 	}
-	//free handle , Although might be able to reuse upon the last execution
 	cufftDestroy(BatchFFTPlan);
     
     
-    ///////////
-	// FFT ends
-	///////////
 	//Kernel to transform into a LV happy readable array
 	Cmplx2Mag << <GridSizeTransfer, BlockSizeAll, 0, 0 >> > (d_3DiFFT, d_ImgOutMag, size3Darray, numElements);
+	
 	//Copy device memory to hosts
 	cudaMemcpy(h_ImgOutMag, d_ImgOutMag, mem3Darray, cudaMemcpyDeviceToHost);
-	//deallocate CUDA memory
-		
-			
+	
+	//deallocate CUDA memory		
 	cudaFree(d_3DiFFT);
 	cudaFree(d_ImgOutMag);
 }
@@ -412,23 +389,20 @@ void ReturnMagnitudeZStack2(float* h_bfpMag, float* h_bfpPhase,float* h_ImgOutMa
 
 // Batched 2D FFT plan function
 
-
-	/* Create a batched 2D plan, or batch FFT , need to declare when each image begins! */
+void createFFTplan(cufftHandle BatchFFTPlan,int row,int column,int batchSizeZ){
 	int istride = 1; //means every element is used in the computation
-	int ostride = 1; //means every element used in the computatio is output
+	int ostride = 1; //means every element used in the computation is output
 	int idist = row*column;
 	int odist = row*column;
 	int inembed[] = { row,column };
 	int onembed[] = { row,column };
 	const int NRANK = 2;
 	int n[NRANK] = { row,column };
-	int BATCH = zrange;
-	cufftHandle BatchFFTPlan;
-	if (cufftPlanMany(&BatchFFTPlan, NRANK, n,
+	int BATCH = batchSizeZ;
+
+	cufftPlanMany(&BatchFFTPlan, NRANK, n,
 		inembed, istride, idist,// *inembed, istride, idist 
 		onembed, ostride, odist,// *onembed, ostride, odist 
-		CUFFT_C2C, BATCH) != CUFFT_SUCCESS){
-
-		fprintf(stderr, "CUFFT Error: Unable to create plan\n");
-		return;
-	}
+		CUFFT_C2C, BATCH) 
+}
+	
