@@ -1,8 +1,9 @@
+#include "Propagate3D.h"
 #include <cufft.h>
 #include <cuComplex.h>
 #include <device_functions.h>
 #include <math.h>
-#include <floath.h>
+#include <float.h>
 #include <stdio.h>
 
 ///////////////////////////////
@@ -14,9 +15,9 @@
 
 __global__ void fftshift2D(cufftComplex *dataIn,int row, int column)
 { 
-    ix=threadIdx.x+blockIdx.x*blockDim.x;
-    iy=threadIdx.y+blockIdx.y*blockDim.y;
-    idx=ix+iy*row;
+    const int ix=threadIdx.x+blockIdx.x*blockDim.x;
+    const int iy=threadIdx.y+blockIdx.y*blockDim.y;
+    const int idx=ix+iy*row;
 
     float a=1-2*((ix+iy)&1);
     dataIn[idx].x*=a;
@@ -366,7 +367,7 @@ void ReturnMagnitudeZStack2(float* h_bfpMag, float* h_bfpPhase,float* h_ImgOutMa
 
 	//FFT calculation goes here
 	cufftHandle BatchFFTPlan;
-	createFFTplan(BatchFFTplan,row,column,zrange);
+	createFFTplan(BatchFFTPlan,row,column,zrange);
 
 	if (cufftExecC2C(BatchFFTPlan, d_3DiFFT, d_3DiFFT, CUFFT_INVERSE) != CUFFT_SUCCESS) {
 		fprintf(stderr, "CUFFT Error: Failed to execute plan\n");
@@ -403,6 +404,6 @@ void createFFTplan(cufftHandle BatchFFTPlan,int row,int column,int batchSizeZ){
 	cufftPlanMany(&BatchFFTPlan, NRANK, n,
 		inembed, istride, idist,// *inembed, istride, idist 
 		onembed, ostride, odist,// *onembed, ostride, odist 
-		CUFFT_C2C, BATCH) 
+		CUFFT_C2C, BATCH);
 }
 	
