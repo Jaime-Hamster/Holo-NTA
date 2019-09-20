@@ -81,6 +81,7 @@
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <CudaCompile Include="HaarTransform.cu" />
     <CudaCompile Include="kernel.cu" />
     <CudaCompile Include="Propagate3D.cu" />
   </ItemGroup>
